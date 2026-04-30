@@ -1,0 +1,31 @@
+name: habithive
+description: "Gamified habit tracker with streaks, challenges, and rewards"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # UI & Animations
+  google_fonts: ^6.2.1
+  fl_chart: ^0.69.0
+  lottie: ^3.1.1
+  
+  # State Management
+  provider: ^6.1.2
+  flutter_hooks: ^0.20.1
+  
+  # Local Storage
+  shared_preferences: ^2.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  
+flutter:
+  uses-material-design: true
