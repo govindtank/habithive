@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../config/habit_config.dart';
 
 /// Habit Model - Represents a single habit with tracking data
 class Habit {
@@ -16,10 +17,10 @@ class Habit {
     required this.name,
     required this.description,
     required this.category,
-    int streak = 0,
-    int totalCompleted = 0,
-    bool isStreakActive = true,
-  })  : lastCompleted = null;
+    this.streak = 0,
+    this.totalCompleted = 0,
+    this.isStreakActive = true,
+  }) : lastCompleted = null;
   
   // Check if habit can be completed today
   bool get canComplete => 
