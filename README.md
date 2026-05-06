@@ -17,7 +17,9 @@ HabitHive transforms habit building into an exciting game with streaks, challeng
 - ⭐ **XP & Leveling** — Earn XP for completing habits, level up as you progress
 - 🏆 **Gamification** — Milestone badges (Bronze, Silver, Gold, Platinum, Diamond)
 - 📊 **Progress Dashboard** — Real-time daily completion rate and stats
-- 🎨 **Material Design 3** — Modern orange/green energetic theme
+- 🌓 **Dark / Light Mode** — Toggle between dark and light themes (persisted across sessions)
+- 💾 **Session Persistence** — Progress and theme preference saved locally (survives page refresh)
+- 🎨 **Material Design 3** — Modern orange/green energetic theme with WCAG AA contrast
 - 📱 **Responsive Web** — Optimized for desktop, tablet, and mobile browsers
 
 ## 🚀 Tech Stack
@@ -37,17 +39,19 @@ HabitHive transforms habit building into an exciting game with streaks, challeng
 ```
 habit-hive/
 ├── lib/
-│   ├── main.dart                    # App entry point & theme
+│   ├── main.dart                    # App entry point & theme (light/dark)
 │   ├── config/
 │   │   ├── app_config.dart          # App-wide configuration
 │   │   └── habit_config.dart        # Habit tracking constants
 │   ├── models/
-│   │   └── habit_model.dart         # Habit & UserProfile models
+│   │   └── habit_model.dart         # Habit & UserProfile models (JSON serialization)
 │   ├── providers/
-│   │   └── habit_provider.dart      # State management with Provider
-│   └── screens/
-│       ├── home_screen.dart         # Main dashboard
-│       └── onboarding_screen.dart   # Onboarding flow
+│   │   └── habit_provider.dart      # State management with Provider + persistence
+│   ├── screens/
+│   │   ├── home_screen.dart         # Main dashboard
+│   │   └── onboarding_screen.dart   # Onboarding flow with theme toggle
+│   └── services/
+│       └── storage_service.dart     # SharedPreferences persistence layer
 ├── web/
 │   └── index.html                    # Web entry point
 ├── .github/
