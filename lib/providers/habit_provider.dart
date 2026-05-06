@@ -1,73 +1,64 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/habit_model.dart';
+import '../services/storage_service.dart';
 
-/// Habit Hive Provider - Manages habit list and daily completion
+/// Habit Hive Provider — manages habit list, daily completion, XP, and level
 class HabitHiveProvider extends ChangeNotifier {
   UserProfile _profile = UserProfile();
   UserProfile get profile => _profile;
-  
-  // Initialize with some default habits for demo
-  void initializeDemoHabits() {
-    final now = DateTime.now();
-    
-    _profile.addHabit(Habit(
-      id: 'habit_1',
-      name: 'Morning Exercise',
-      description: 'Do 30 minutes of exercise each morning',
-      category: 'Health',
-      streak: 5,
-      totalCompleted: 42,
-      isStreakActive: true,
-    ));
-    
-    _profile.addHabit(Habit(
-      id: 'habit_2',
-      name: 'Read for 30 mins',
-      description: 'Read books or articles before bed',
-      category: 'Learning',
-      streak: 12,
-      totalCompleted: 89,
-      isStreakActive: true,
-    ));
-    
-    _profile.addHabit(Habit(
-      id: 'habit_3',
-      name: 'Drink Water',
-      description: 'Drink at least 8 glasses of water',
-      category: 'Health',
-      streak: 21,
-      totalCompleted: 156,
-      isStreakActive: true,
-    ));
-    
-    _profile.addHabit(Habit(
-      id: 'habit_4',
-      name: 'Meditate',
-      description: 'Practice mindfulness meditation',
-      category: 'Mental',
-      streak: 3,
-      totalCompleted: 15,
-      isStreakActive: true,
-    ));
+
+  // ── Persistence ─────────────────────────────────────────────────
+  /// Load previously saved profile from storage (called on startup if already onboarded)
+  void loadFromStorage() {
+    final json = StorageService.profileJson;
+    if (json != null && json.isNotEmpty) {
+      try {
+        final data = jsonDecode(json) as Map<String, dynamic>;
+        _profile = UserProfile.fromJson(data);
+        notifyListeners();
+      } catch (_) {
+        // Corrupt data — start fresh
+        _profile = UserProfile();
+      }
+    }
   }
-  
-  // Complete a habit for today
+
+  /// Save current profile to storage
+  Future<void> _saveToStorage() async {
+    try {
+      final json = jsonEncode(_profile.toJson());
+      await StorageService.setProfileJson(json);
+    } catch (_) {
+      // Storage full or unavailable — continue anyway
+    }
+  }
+
+  // ── Demo initialization ──────────────────────────────────────────
+  /// Initialize with sample habits for first-time users
+  void initializeDemoHabits() {
+    _profile = UserProfile.withDefaultHabits();
+    _saveToStorage();
+    notifyListeners();
+  }
+
+  // ── Habit operations ─────────────────────────────────────────────
+  /// Mark a habit as completed today
   void completeHabit(String habitId) {
     final habit = _profile.findHabit(habitId);
-    
     if (habit != null && habit.canComplete) {
       habit.lastCompleted = DateTime.now();
       habit.totalCompleted++;
-      
-      // Earn XP
+
       final xpEarned = habit.earnXp(habit.isStreakActive);
       _profile.addXp(xpEarned);
-      
+
       notifyListeners();
+      _saveToStorage();
     }
   }
-  
-  // Get completed habits count for daily button
-  int get completedToday => 
-    _profile.habits.where((h) => h.canComplete).length;
+
+  /// Get number of habits completed today
+  int get completedToday =>
+      _profile.habits.where((h) => h.canComplete).length;
 }

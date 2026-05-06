@@ -3,12 +3,25 @@ import 'package:provider/provider.dart';
 import '../providers/habit_provider.dart';
 import '../models/habit_model.dart';
 import '../config/habit_config.dart';
+import '../services/storage_service.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+  Future<void> _toggleDarkMode(BuildContext context) async {
+    final current = StorageService.isDarkMode;
+    await StorageService.setDarkMode(!current);
+    // Force rebuild to apply new theme
+    if (context.mounted) {
+      (context as Element).markNeedsBuild();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -20,18 +33,23 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         actions: [
+          // Theme toggle button
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode : Icons.dark_mode,
+              size: 22,
+            ),
+            tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+            onPressed: () => _toggleDarkMode(context),
+          ),
+          // Level badge
           Consumer<HabitHiveProvider>(
             builder: (context, provider, child) {
               final profile = provider.profile;
               final levelProgress = profile.getLevelProgression();
               return Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildLevelBadge(context, profile.currentLevel, levelProgress['levelName']),
-                  ],
-                ),
+                padding: const EdgeInsets.only(right: 8.0),
+                child: _buildLevelBadge(context, profile.currentLevel, levelProgress['levelName']),
               );
             },
           ),
@@ -52,16 +70,13 @@ class HomeScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Daily Progress Card
                         _buildProgressCard(context, profile),
                         const SizedBox(height: 20),
-                        // Stats Row
                         _buildStatsRow(context, profile),
                         const SizedBox(height: 24),
-                        // Habits List
                         Text(
                           'Your Habits',
-                          style: Theme.of(context).textTheme.titleLarge,
+                          style: theme.textTheme.titleLarge,
                         ),
                         const SizedBox(height: 16),
                         if (profile.habits.isEmpty)
@@ -124,22 +139,31 @@ class HomeScreen extends StatelessWidget {
 
   Widget _buildProgressCard(BuildContext context, UserProfile profile) {
     final completionRate = profile.getCompletionRate();
-    final completedCount = profile.habits.where((h) => h.lastCompleted?.day == DateTime.now().day).length;
+    final completedCount = profile.habits.where((h) {
+      final last = h.lastCompleted;
+      if (last == null) return false;
+      final now = DateTime.now();
+      return last.year == now.year && last.month == now.month && last.day == now.day;
+    }).length;
     final isAllDone = completedCount == profile.habits.length && profile.habits.isNotEmpty;
-    final progressColor = isAllDone ? const Color(0xFF7ED957) : Theme.of(context).primaryColor;
+    final progressColor = isAllDone ? const Color(0xFF7ED957) : Theme.of(context).colorScheme.primary;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
 
     return Card(
       elevation: 4,
-      shadowColor: Theme.of(context).primaryColor.withOpacity(0.2),
+      shadowColor: progressColor.withOpacity(0.2),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      color: cardBg,
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           gradient: LinearGradient(
             colors: [
-              Theme.of(context).primaryColor.withOpacity(0.05),
-              Theme.of(context).scaffoldBackgroundColor,
+              progressColor.withOpacity(isDark ? 0.15 : 0.05),
+              cardBg,
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -166,7 +190,7 @@ class HomeScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
-                    color: progressColor.withOpacity(0.1),
+                    color: progressColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -185,7 +209,7 @@ class HomeScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               child: LinearProgressIndicator(
                 value: completionRate,
-                backgroundColor: Colors.grey.shade200,
+                backgroundColor: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
                 valueColor: AlwaysStoppedAnimation<Color>(progressColor),
                 minHeight: 10,
               ),
@@ -240,14 +264,22 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatCard(BuildContext context, {
-    required IconData icon, required Color iconColor,
-    required String value, required String label, required String emoji,
+  Widget _buildStatCard(
+    BuildContext context, {
+    required IconData icon,
+    required Color iconColor,
+    required String value,
+    required String label,
+    required String emoji,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+
     return Card(
       elevation: 2,
       shadowColor: iconColor.withOpacity(0.2),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: cardBg,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -257,15 +289,15 @@ class HomeScreen extends StatelessWidget {
             Text(
               value,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 2),
             Text(
               label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey.shade600,
-              ),
+                    color: isDark ? const Color(0xFF888888) : Colors.grey.shade600,
+                  ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -275,21 +307,25 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+
     return Card(
       elevation: 2,
       shadowColor: Colors.grey.withOpacity(0.2),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      color: cardBg,
       child: Padding(
         padding: const EdgeInsets.all(40.0),
         child: Column(
           children: [
-            Text('🌱', style: const TextStyle(fontSize: 72)),
+            const Text('🌱', style: TextStyle(fontSize: 72)),
             const SizedBox(height: 20),
             Text(
               'No habits yet',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -309,11 +345,21 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildHabitCard(BuildContext context, Habit habit, HabitHiveProvider provider) {
-    final isCompletedToday = habit.lastCompleted?.day == DateTime.now().day;
+    final now = DateTime.now();
+    final isCompletedToday = habit.lastCompleted != null &&
+        habit.lastCompleted!.year == now.year &&
+        habit.lastCompleted!.month == now.month &&
+        habit.lastCompleted!.day == now.day;
+
     final categoryColor = Color(HabitConfig.categoryColors[habit.category] ?? 0xFF9E9E9E);
-    
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textColor = isDark ? const Color(0xFFE8E8E8) : const Color(0xFF1A1A1A);
+    final subtextColor = isDark ? const Color(0xFF999999) : const Color(0xFF666666);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12.0),
+      color: cardBg,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
@@ -323,7 +369,7 @@ class HomeScreen extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: categoryColor.withOpacity(0.1),
+                color: categoryColor.withOpacity(isDark ? 0.2 : 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -332,9 +378,8 @@ class HomeScreen extends StatelessWidget {
                 size: 24,
               ),
             ),
-            
             const SizedBox(width: 16),
-            
+
             // Habit Info
             Expanded(
               child: Column(
@@ -342,15 +387,18 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   Text(
                     habit.name,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    style: TextStyle(
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     habit.description,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade600,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: subtextColor,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -358,29 +406,23 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(
-                        Icons.local_fire_department,
-                        size: 16,
-                        color: Colors.orange,
-                      ),
+                      Icon(Icons.local_fire_department, size: 16, color: Colors.orange),
                       const SizedBox(width: 4),
                       Text(
                         '${habit.streak} day streak',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        style: TextStyle(
+                          fontSize: 13,
                           color: Colors.orange,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(width: 16),
-                      Icon(
-                        Icons.check_circle,
-                        size: 16,
-                        color: Colors.green,
-                      ),
+                      Icon(Icons.check_circle, size: 16, color: Colors.green),
                       const SizedBox(width: 4),
                       Text(
                         '${habit.totalCompleted} completed',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        style: TextStyle(
+                          fontSize: 13,
                           color: Colors.green,
                           fontWeight: FontWeight.w600,
                         ),
@@ -390,7 +432,7 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             // Complete Button
             IconButton(
               onPressed: isCompletedToday || !habit.canComplete
@@ -398,7 +440,7 @@ class HomeScreen extends StatelessWidget {
                   : () => provider.completeHabit(habit.id),
               icon: Icon(
                 isCompletedToday ? Icons.check_circle : Icons.circle_outlined,
-                color: isCompletedToday ? Colors.green : Colors.grey.shade400,
+                color: isCompletedToday ? Colors.green : (isDark ? Colors.grey.shade600 : Colors.grey.shade400),
                 size: 32,
               ),
             ),
@@ -410,18 +452,12 @@ class HomeScreen extends StatelessWidget {
 
   IconData _getCategoryIcon(String category) {
     switch (category) {
-      case 'Health':
-        return Icons.favorite;
-      case 'Productivity':
-        return Icons.work;
-      case 'Mental':
-        return Icons.psychology;
-      case 'Social':
-        return Icons.people;
-      case 'Learning':
-        return Icons.school;
-      default:
-        return Icons.category;
+      case 'Health':     return Icons.favorite;
+      case 'Productivity': return Icons.work;
+      case 'Mental':     return Icons.psychology;
+      case 'Social':     return Icons.people;
+      case 'Learning':   return Icons.school;
+      default:           return Icons.category;
     }
   }
 }
