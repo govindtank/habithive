@@ -12,6 +12,7 @@ class Habit {
   DateTime? lastCompleted;
   bool isStreakActive;
   final Set<String> streakRewardsEarned;
+  List<DateTime> completionHistory;
 
   Habit({
     required this.id,
@@ -21,13 +22,16 @@ class Habit {
     this.streak = 0,
     this.totalCompleted = 0,
     this.isStreakActive = true,
-  }) : streakRewardsEarned = {};
+    List<DateTime>? completionHistory,
+  })  : streakRewardsEarned = {},
+        completionHistory = completionHistory ?? [];
 
   // Check if habit can be completed today
   bool get canComplete =>
-      (isStreakActive || lastCompleted == null) &&
-      DateTime.now().day != lastCompleted?.day ||
-      lastCompleted == null;
+      lastCompleted == null ||
+      DateTime.now().day != lastCompleted!.day ||
+      DateTime.now().month != lastCompleted!.month ||
+      DateTime.now().year != lastCompleted!.year;
 
   int earnXp(bool isStreakBonus) {
     final baseXp = HabitConfig.dailyXp;
@@ -56,7 +60,24 @@ class Habit {
         'lastCompleted': lastCompleted?.toIso8601String(),
         'isStreakActive': isStreakActive,
         'streakRewardsEarned': streakRewardsEarned.toList(),
+        'completionHistory': completionHistory.map((d) => d.toIso8601String()).toList(),
       };
+
+  void toggleComplete() {
+    lastCompleted = DateTime.now();
+    totalCompleted++;
+    completionHistory.add(lastCompleted!);
+    // Keep last 90 days
+    if (completionHistory.length > 90) {
+      completionHistory.removeRange(0, completionHistory.length - 90);
+    }
+  }
+
+  int get completionsToday {
+    final now = DateTime.now();
+    return completionHistory.where((d) =>
+        d.year == now.year && d.month == now.month && d.day == now.day).length;
+  }
 
   factory Habit.fromJson(Map<String, dynamic> json) {
     final habit = Habit(
@@ -75,6 +96,11 @@ class Habit {
     );
     if (json['lastCompleted'] != null) {
       habit.lastCompleted = DateTime.tryParse(json['lastCompleted'] as String);
+    }
+    if (json['completionHistory'] != null) {
+      habit.completionHistory = (json['completionHistory'] as List)
+          .map((e) => DateTime.parse(e as String))
+          .toList();
     }
     return habit;
   }
@@ -223,6 +249,31 @@ class UserProfile with ChangeNotifier {
     notifyListeners();
   }
 
+  void updateHabit(String id, String name, String description, String category) {
+    final h = findHabit(id);
+    if (h != null) {
+      h.name = name;
+      h.description = description;
+      h.category = category;
+      notifyListeners();
+    }
+  }
+
+  /// Returns a list of 7 integers (Sun-Sat) with completion counts per day
+  List<int> getWeekHistory() {
+    final now = DateTime.now();
+    final weekStart = now.subtract(Duration(days: now.weekday % 7));
+    return List.generate(7, (i) {
+      final day = weekStart.add(Duration(days: i));
+      int count = 0;
+      for (final h in _habits) {
+        count += h.completionHistory.where((d) =>
+            d.year == day.year && d.month == day.month && d.day == day.day).length;
+      }
+      return count;
+    });
+  }
+
   Habit? findHabit(String id) {
     try {
       return _habits.firstWhere((h) => h.id == id);
@@ -236,6 +287,13 @@ class UserProfile with ChangeNotifier {
   }
 
   bool hasHabit(String id) => _habits.any((h) => h.id == id);
+
+  void handleHabitCompleted() {
+    final now = DateTime.now();
+    _currentStreak++;
+    _lastHabitDate = now;
+    notifyListeners();
+  }
 
   void checkHabitsDaily() {
     final now = DateTime.now();

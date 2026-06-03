@@ -3,62 +3,86 @@ import 'package:flutter/material.dart';
 import '../models/habit_model.dart';
 import '../services/storage_service.dart';
 
-/// Habit Hive Provider — manages habit list, daily completion, XP, and level
+/// Habit Hive Provider — manages habits with CRUD, daily completion, XP, and level
 class HabitHiveProvider extends ChangeNotifier {
   UserProfile _profile = UserProfile();
   UserProfile get profile => _profile;
 
   // ── Persistence ─────────────────────────────────────────────────
-  /// Load previously saved profile from storage (called on startup if already onboarded)
   void loadFromStorage() {
     final json = StorageService.profileJson;
     if (json != null && json.isNotEmpty) {
       try {
         final data = jsonDecode(json) as Map<String, dynamic>;
         _profile = UserProfile.fromJson(data);
-        notifyListeners();
       } catch (_) {
-        // Corrupt data — start fresh
         _profile = UserProfile();
       }
     }
   }
 
-  /// Save current profile to storage
-  Future<void> _saveToStorage() async {
+  Future<void> _save() async {
     try {
-      final json = jsonEncode(_profile.toJson());
-      await StorageService.setProfileJson(json);
-    } catch (_) {
-      // Storage full or unavailable — continue anyway
-    }
+      await StorageService.setProfileJson(jsonEncode(_profile.toJson()));
+    } catch (_) {}
   }
 
   // ── Demo initialization ──────────────────────────────────────────
-  /// Initialize with sample habits for first-time users
   void initializeDemoHabits() {
     _profile = UserProfile.withDefaultHabits();
-    _saveToStorage();
+    _save();
     notifyListeners();
   }
 
-  // ── Habit operations ─────────────────────────────────────────────
-  /// Mark a habit as completed today
-  void completeHabit(String habitId) {
-    final habit = _profile.findHabit(habitId);
-    if (habit != null && habit.canComplete) {
-      habit.lastCompleted = DateTime.now();
-      habit.totalCompleted++;
-
-      final xpEarned = habit.earnXp(habit.isStreakActive);
-      _profile.addXp(xpEarned);
-
-      notifyListeners();
-      _saveToStorage();
-    }
+  // ── CRUD ─────────────────────────────────────────────────────────
+  void addHabit(String name, String description, String category) {
+    final habit = Habit(
+      id: 'h_${DateTime.now().millisecondsSinceEpoch}_${_profile.habits.length}',
+      name: name,
+      description: description,
+      category: category,
+    );
+    _profile.addHabit(habit);
+    _save();
   }
 
-  /// Get number of habits completed today
-  int get completedToday =>
-      _profile.habits.where((h) => h.canComplete).length;
+  void updateHabit(String id, String name, String description, String category) {
+    _profile.updateHabit(id, name, description, category);
+    _save();
+  }
+
+  void deleteHabit(String id) {
+    _profile.removeHabit(id);
+    _save();
+  }
+
+  // ── Daily completion ─────────────────────────────────────────────
+  void completeHabit(String habitId) {
+    final habit = _profile.findHabit(habitId);
+    if (habit == null || !habit.canComplete) return;
+
+    habit.toggleComplete();
+
+    // Update streak
+    _profile.handleHabitCompleted();
+
+    // Award XP
+    final xpEarned = habit.earnXp(habit.isStreakActive);
+    _profile.addXp(xpEarned);
+
+    notifyListeners();
+    _save();
+  }
+
+  // ── Stats ────────────────────────────────────────────────────────
+  int get completedToday {
+    final now = DateTime.now();
+    return _profile.habits.where((h) =>
+        h.lastCompleted != null &&
+        h.lastCompleted!.year == now.year &&
+        h.lastCompleted!.month == now.month &&
+        h.lastCompleted!.day == now.day).length;
+  }
+
+  List<int> get weekHistory => _profile.getWeekHistory();
 }

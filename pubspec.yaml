@@ -1,5 +1,5 @@
 name: habithive
-description: "Gamified habit tracker with streaks, challenges, and rewards"
+description: "Habit Hive — Gamified habit tracker with streaks, weekly charts, and level progression. Build better habits, one day at a time."
 publish_to: 'none'
 version: 1.0.0+1
 
